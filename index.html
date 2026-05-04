@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>택시 일일수입 관리</title>
+<style>
+  :root{--blue:#2563eb;--bg:#f4f6fb;--card:#fff;--text:#111827;--muted:#6b7280;--line:#e5e7eb;}
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);font-family:system-ui,-apple-system,Segoe UI,Roboto,'Noto Sans KR',sans-serif;color:var(--text);}
+  header{background:linear-gradient(135deg,#1d4ed8,#2563eb);color:white;padding:28px 18px 24px;border-radius:0 0 28px 28px;box-shadow:0 8px 22px rgba(37,99,235,.25);}
+  h1{font-size:24px;margin:0 0 18px;font-weight:800}.top{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.loginOverlay{position:fixed;inset:0;background:linear-gradient(135deg,#1d4ed8,#2563eb);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px}
+.loginBox{width:100%;max-width:360px;background:white;border-radius:28px;padding:26px;box-shadow:0 20px 50px rgba(17,24,39,.28);text-align:center}
+.loginBox h2{margin:0 0 8px;font-size:24px}
+.loginBox p{margin:0 0 18px;color:#6b7280;font-size:14px;line-height:1.5}
+.loginBox input{width:100%;text-align:center;font-size:20px;font-weight:800;letter-spacing:4px}
+.loginBox button{width:100%;margin-top:12px;background:#2563eb;color:white}
+.loginError{height:20px;color:#dc2626;font-size:13px;font-weight:800;margin-top:10px}
+  select,button,input{font:inherit} select,input{border:1px solid var(--line);border-radius:14px;padding:13px 12px;background:white;min-width:0}
+  button{border:0;border-radius:16px;padding:13px 16px;font-weight:800;background:#e5e7eb;color:#111827}
+  .tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:20px 14px 10px}.tab{background:white;border:1px solid var(--line);border-radius:18px;padding:13px 6px;text-align:center;font-weight:800}.tab.active{background:#111827;color:#fff}
+  .page{display:none;padding:14px 14px 90px}.page.active{display:block}.card{background:white;border:1px solid var(--line);border-radius:24px;padding:18px;margin-bottom:14px;box-shadow:0 8px 20px rgba(17,24,39,.06)}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field label{display:block;font-size:13px;color:var(--muted);margin:0 0 6px 4px}.field input,.field select{width:100%}
+  .result{display:grid;grid-template-columns:1fr 1fr;gap:10px}.box{background:#f9fafb;border:1px solid var(--line);border-radius:16px;padding:12px}.box small{display:block;color:var(--muted);margin-bottom:6px}.box b{font-size:18px}
+  .primary{background:var(--blue);color:white;width:100%;margin-top:12px}.danger{background:#dc2626;color:white}.deleteBtn{background:#dc2626;color:white;font-weight:900;padding:8px 12px;border-radius:12px;font-size:14px;box-shadow:0 6px 14px rgba(220,38,38,.25)}
+  .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:18px;background:white}
+  table{width:100%;border-collapse:collapse;min-width:720px} thead th{position:sticky;top:0;background:#f8fafc;color:#374151;font-size:14px;z-index:1}
+  th,td{padding:12px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap} th:first-child,td:first-child,th:nth-child(2),td:nth-child(2),th:nth-child(3),td:nth-child(3){text-align:center}
+  .muted{color:var(--muted);font-size:14px}.summary{font-size:15px;line-height:1.9}.summary b{float:right}
+  @media (max-width:430px){.grid{grid-template-columns:1fr 1fr}.result{grid-template-columns:1fr 1fr} h1{font-size:22px}}
+</style>
+</head>
+<body>
+
+<div id="loginOverlay" class="loginOverlay">
+  <div class="loginBox">
+    <h2>택시 일일수입 관리</h2>
+    <p>법인택시 체험용 무료버전<br>비밀번호를 입력하면 사용할 수 있습니다.</p>
+    <input id="loginPass" type="password" inputmode="numeric" placeholder="비밀번호" autocomplete="off">
+    <button onclick="checkLogin()">로그인</button>
+    <div id="loginError" class="loginError"></div>
+  </div>
+</div>
+
+<header>
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;"><h1>🚕 택시 일일수입 관리</h1><div style="text-align:right;font-weight:900;font-size:14px;color:#eff6ff;">법인택시<br>체험용 무료버전</div></div>
+  <div class="top">
+    <select id="yearSel"></select>
+    <select id="monthSel"></select>
+    
+  </div>
+</header>
+
+<nav class="tabs">
+  <div class="tab active" onclick="showPage('input',this)">오늘입력</div>
+  <div class="tab" onclick="showPage('daily',this)">일별현황</div>
+  <div class="tab" onclick="showPage('monthly',this)">월집계</div>
+  <div class="tab" onclick="showPage('settings',this)">설정</div>
+</nav>
+
+<section id="input" class="page active">
+  <div class="card">
+    <h2>오늘 입력</h2>
+    <div class="grid">
+      <div class="field"><label>일자</label><input id="datePick" type="date"></div>
+      <div class="field"><label>근무기준</label>
+        <select id="workType">
+          <option>정상근무</option>
+          <option>선택근무</option>
+          <option>휴무</option>
+          <option>병가</option>
+        </select>
+      </div>
+      <div class="field"><label>카드결제</label><input id="company" inputmode="numeric" type="text" placeholder="0"></div>
+      <div class="field"><label>손님팁</label><input id="cashIncome" inputmode="numeric" type="text" placeholder="0"></div>
+      <div class="field"><label>카카오자동결제</label><input id="kakao" inputmode="numeric" type="text" placeholder="0"></div>
+      <div class="field"><label>총합계</label><input id="total" inputmode="numeric" type="text" placeholder="0"></div>
+      <div class="field"><label>개인부담 연료비</label><input id="fuelCost" inputmode="numeric" type="text" placeholder="0"></div>
+    </div>
+    <button class="primary" onclick="saveEntry()">저장</button>
+  </div>
+  <div class="card">
+    <h2>자동 계산</h2>
+    <div class="result">
+      <div class="box"><small>현금수입</small><b id="rCash"></b></div>
+      <div class="box"><small>카드+카카오</small><b id="rCompanyKakao"></b></div>
+      <div class="box"><small>초과수입</small><b id="rOver"></b></div>
+      <div class="box"><small>개인부담 연료비</small><b id="rFuelCost"></b></div>
+      
+      <div class="box"><small>금일총운행수입</small><b id="rTodayRun"></b></div>
+    </div>
+  </div>
+</section>
+
+<section id="daily" class="page">
+  <div class="card">
+    <h2>일별 현황</h2>
+    <p class="muted">입력·저장한 날짜만 표시됩니다.</p>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr>
+            <th>일자</th><th>요일</th><th>근무</th><th>총합계</th><th>카드결제</th><th>카카오자동결제</th><th>현금수입</th><th>손님팁</th><th>개인부담 연료비</th><th>초과수입</th><th>금일총운행</th>
+          </tr>
+        </thead>
+        <tbody id="dailyBody"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="monthly" class="page">
+  <div class="card">
+    <h2>월 집계</h2>
+    <div class="summary" id="monthlySummary"></div>
+  </div>
+</section>
+
+<section id="settings" class="page">
+  <div class="card">
+    <h2>설정</h2>
+    <div class="grid">
+      <div class="field"><label>사납금(정상근무)</label><input id="baseFeeNormal" type="number"><div style="font-size:12px;color:#6b7280;margin-top:6px;">근무형태별로 지정사납금을 입력해주세요</div></div>
+      <div class="field"><label>사납금(선택근무)</label><input id="baseFeeOptional" type="number"><div style="font-size:12px;color:#6b7280;margin-top:6px;">선택근무 시 적용되는 사납금 또는 개인부담 운행비를 입력하세요</div></div>
+      
+      
+    </div>
+    <button class="primary" onclick="saveSettings()">설정 저장</button>
+    <div style="display:flex;justify-content:flex-end;margin-top:14px;"><button class="deleteBtn" onclick="clearAll()">전체 데이터 삭제</button></div>
+  </div>
+</section>
+
+<script>
+const K='taxi_income_corporate_trial_v1';
+let data = JSON.parse(localStorage.getItem(K)||'{"entries":{},"settings":{"baseFeeNormal":161000,"baseFeeOptional":15000}}');
+const $=id=>document.getElementById(id);
+function fmt(n){return (Number(n)||0).toLocaleString('ko-KR')}
+function num(v){return Number(String(v||'').replace(/,/g,'').replace(/[^0-9.-]/g,''))||0}
+function selectedYM(){const v=$('datePick').value; if(v) return v.slice(0,7); return $('yearSel').value+'-'+String($('monthSel').value).padStart(2,'0')}
+function selectedDay(){const v=$('datePick').value; return v ? Number(v.slice(8,10)) : null}
+function key(){return $('yearSel').value+'-'+String($('monthSel').value).padStart(2,'0')}
+function ymEntries(){return data.entries[key()]||{}}
+function weekdayByDate(dateStr){return ['일','월','화','수','목','금','토'][new Date(dateStr+'T00:00:00').getDay()]}
+function clearInputFields(){
+  $('company').value='';
+  $('cashIncome').value='';
+  $('total').value='';
+  $('kakao').value='';
+  $('fuelCost').value='';
+  $('workType').value='정상근무';
+}
+function loadEntryForSelectedDate(){
+  const v=$('datePick').value;
+  if(!v){ clearInputFields(); calc(); return; }
+  const k=v.slice(0,7), d=Number(v.slice(8,10));
+  const saved = data.entries[k] && data.entries[k][d];
+  if(saved){
+    $('company').value=saved.company ? fmt(saved.company) : '';
+    $('cashIncome').value=saved.cashIncome ? fmt(saved.cashIncome) : '';
+    $('total').value=saved.total ? fmt(saved.total) : '';
+    $('kakao').value=saved.kakao ? fmt(saved.kakao) : '';
+    $('fuelCost').value=saved.fuelCost ? fmt(saved.fuelCost) : '';
+    $('workType').value=saved.workType || '정상근무';
+  }else{
+    clearInputFields();
+  }
+  calc();
+}
+function setYMFromDate(){
+  const v=$('datePick').value;
+  if(!v) return;
+  $('yearSel').value = v.slice(0,4);
+  $('monthSel').value = Number(v.slice(5,7));
+  loadEntryForSelectedDate();
+  renderAll();
+}
+function init(){
+  const now=new Date();
+  for(let y=now.getFullYear()-1;y<=now.getFullYear()+1;y++) $('yearSel').insertAdjacentHTML('beforeend',`<option ${y==now.getFullYear()?'selected':''}>${y}</option>`);
+  for(let m=1;m<=12;m++) $('monthSel').insertAdjacentHTML('beforeend',`<option value="${m}" ${m==now.getMonth()+1?'selected':''}>${m}월</option>`);
+  const mm=String(now.getMonth()+1).padStart(2,'0'), dd=String(now.getDate()).padStart(2,'0');
+  $('datePick').value=`${now.getFullYear()}-${mm}-${dd}`;
+  loadSettings(); bindCalc(); addCommaFormatting(); loadEntryForSelectedDate(); renderAll();
+  ['yearSel','monthSel'].forEach(id=>$(id).addEventListener('change',renderAll));
+  $('datePick').addEventListener('change',setYMFromDate);
+}
+function calc(){
+  const company=num($('company').value), cashIncome=num($('cashIncome').value), total=num($('total').value), kakao=num($('kakao').value), fuelCost=num($('fuelCost').value);
+  const cash = total - (company + kakao);
+  const ck = company + kakao;
+
+  let base = 0;
+  if($('workType').value === '정상근무') {
+    base = num($('baseFeeNormal')?.value || data.settings.baseFeeNormal || 161000);
+  } else if($('workType').value === '선택근무') {
+    base = num($('baseFeeOptional')?.value || data.settings.baseFeeOptional || 15000);
+  } else {
+    base = 0;
+  }
+
+  const over = ck - base - fuelCost;
+  const todayRun = total + cashIncome;
+
+  $('rCash').textContent = fmt(cash);
+  $('rCompanyKakao').textContent = fmt(ck);
+  $('rOver').textContent = fmt(over);
+  $('rFuelCost').textContent = fmt(fuelCost);
+  $('rTodayRun').textContent = fmt(todayRun);
+
+  return {
+    company,
+    cashIncome,
+    total,
+    kakao,
+    fuelCost,
+    workType: $('workType').value,
+    cash,
+    ck,
+    over,
+    todayRun,
+    date: $('datePick').value
+  };
+}
+function bindCalc(){['company','cashIncome','total','kakao','fuelCost'].forEach(id=>$(id).addEventListener('input',calc)); $('workType').addEventListener('change',calc);}
+function saveEntry(){
+  const date=$('datePick').value; if(!date){alert('일자를 선택하세요');return}
+  const k=date.slice(0,7), d=Number(date.slice(8,10));
+  if(!data.entries[k]) data.entries[k]={};
+  data.entries[k][d]=calc();
+  localStorage.setItem(K,JSON.stringify(data));
+  $('yearSel').value=date.slice(0,4); $('monthSel').value=Number(date.slice(5,7));
+  renderAll(); alert('저장되었습니다');
+}
+function renderDaily(){
+  const k=key();
+  const rows=Object.entries(data.entries[k]||{}).sort((a,b)=>+a[0]-+b[0]);
+  $('dailyBody').innerHTML = rows.length ? rows.map(([d,e])=>{
+    const date=e.date || `${k}-${String(d).padStart(2,'0')}`;
+    return `<tr><td>${d}</td><td>${weekdayByDate(date)}</td><td>${e.workType||''}</td><td>${fmt(e.total)}</td><td>${fmt(e.company)}</td><td>${fmt(e.kakao)}</td><td>${fmt(e.cash)}</td><td>${fmt(e.cashIncome)}</td><td>${fmt(e.fuelCost)}</td><td>${fmt(e.over)}</td><td>${fmt(e.todayRun)}</td></tr>`;
+  }).join('') : `<tr><td colspan="11" style="text-align:center;color:#6b7280">저장된 내역이 없습니다.</td></tr>`;
+}
+function renderMonthly(){
+  const rows=Object.values(ymEntries());
+  const sum = name => rows.reduce((a,e)=>a+(+e[name]||0),0);
+  const normal=rows.filter(e=>e.workType==='정상근무').length;
+  const optional=rows.filter(e=>e.workType==='선택근무').length;
+  const rest=rows.filter(e=>e.workType==='휴무').length;
+  const sick=rows.filter(e=>e.workType==='병가').length;
+  
+  
+  $('monthlySummary').innerHTML = `
+  정상근무 <b>${normal}일</b><br>
+  선택근무 <b>${optional}일</b><br>
+  휴무 <b>${rest}일</b><br>
+  병가 <b>${sick}일</b><br>
+  총합계 <b>${fmt(sum('total'))}</b><br>
+  손님팁 <b>${fmt(sum('cashIncome'))}</b><br>
+  개인부담 연료비 <b>${fmt(sum('fuelCost'))}</b><br>
+  카드결제 <b>${fmt(sum('company'))}</b><br>
+  카카오자동결제 <b>${fmt(sum('kakao'))}</b><br>
+  현금수입 <b>${fmt(sum('cash'))}</b><br>
+  초과수입 <b>${fmt(sum('over'))}</b><br>
+  
+  금월운행수입 <b>${fmt(sum('todayRun'))}</b><br>
+  
+`;
+}
+function renderAll(){renderDaily();renderMonthly();calc();}
+function showPage(id,el){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));$(id).classList.add('active');document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');renderAll();}
+function loadSettings(){for(const [k,v] of Object.entries(data.settings)) if($(k)) $(k).value=v}
+function saveSettings(){['baseFeeNormal','baseFeeOptional'].forEach(k=>data.settings[k]=num($(k).value));localStorage.setItem(K,JSON.stringify(data));renderAll();alert('설정 저장되었습니다')}
+function resetMonth(){if(confirm('이번 달 입력내역을 모두 삭제할까요?')){delete data.entries[key()];localStorage.setItem(K,JSON.stringify(data));renderAll();}}
+function clearAll(){if(confirm('전체 데이터를 삭제할까요?')){localStorage.removeItem(K);location.reload();}}
+init();
+initLogin();
+
+function addCommaFormatting(){
+  const ids=['company','cashIncome','total','kakao','fuelCost'];
+  ids.forEach(id=>{
+    const el=$(id);
+    el.addEventListener('input', e=>{
+      calc();
+    });
+    el.addEventListener('blur', e=>{
+      const v=String(el.value||'').replace(/,/g,'').replace(/[^0-9]/g,'');
+      el.value = v ? Number(v).toLocaleString('ko-KR') : '';
+    });
+    el.addEventListener('focus', e=>{
+      el.value = String(el.value||'').replace(/,/g,'');
+    });
+  });
+}
+
+
+const APP_PASSWORD='0000';
+function checkLogin(){
+  const pass=$('loginPass').value.trim();
+  if(pass===APP_PASSWORD){
+    sessionStorage.setItem('taxi_login_ok','1');
+    $('loginOverlay').style.display='none';
+    $('loginPass').value='';
+  }else{
+    $('loginError').textContent='비밀번호가 맞지 않습니다.';
+    $('loginPass').value='';
+    $('loginPass').focus();
+  }
+}
+function initLogin(){
+  if(sessionStorage.getItem('taxi_login_ok')==='1'){
+    $('loginOverlay').style.display='none';
+  }else{
+    $('loginOverlay').style.display='flex';
+    setTimeout(()=>$('loginPass').focus(),200);
+  }
+  $('loginPass').addEventListener('keydown',e=>{
+    if(e.key==='Enter') checkLogin();
+  });
+}
+
+</script>
+
+<footer style="
+  text-align:center;
+  font-size:13px;
+  font-weight:600;
+  color:#4b5563;
+  padding:24px 10px 36px;
+  border-top:1px solid #e5e7eb;
+  margin-top:20px;
+  line-height:1.6;
+">
+  TIS Co., Ltd.<br>
+  Taxi Income Solution<br>
+  © 2026 All rights reserved.
+</footer>
+</body>
+
+</html>
